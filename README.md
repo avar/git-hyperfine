@@ -63,6 +63,10 @@ some of them as noted in [ALTERED OPTIONS](#ALTOPT).
 
 # ALTERED OPTIONS
 
+  - \--help, --version  
+    git-hyperfine’s help and version output. The help output is the raw
+    asciidoc of the installed man page.
+
   - \--build, --prepare, \<command\>  
     Your *--build* command (if any) will be chained behind the build
     command we’ll use to setup the man:git-worktree\[1\].

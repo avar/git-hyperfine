@@ -150,6 +150,13 @@ debug "config: run-dir: <$run_dir>"
 ## our {run_dir}.
 git_dir=$(git rev-parse --absolute-git-dir)
 
+## --version output specific to git-hyperfine
+if test -n "$version"
+then
+	echo git-hyperfine version whatever
+	exit 0
+fi
+
 ## --help output specific to git-hyperfine
 if test -n "$help"
 then
@@ -233,6 +240,10 @@ man:hyperfine[1]. We'll change some of them as noted in
 
 ALTERED OPTIONS[[ALTOPT]]
 -------------------------
+
+--help, --version::
+	git-hyperfine's help and version output. The help output is
+	the raw asciidoc of the installed man page.
 
 --build, --prepare, <command>::
 	 Your '--build' command (if any) will be chained behind the
