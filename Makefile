@@ -103,8 +103,9 @@ PUSH_OPT = --dry-run
 .PHONY: push-gitlab
 push-gitlab: README.md
 	! git status --porcelain -- $< | grep .
-	git push origin HEAD $(PUSH_OPT)
-.PHONY:  push-github
+	git push gitlab HEAD $(PUSH_OPT)
+
+.PHONY: push-github
 push-github: README.md
 	! git status --porcelain -- $< | grep .
 	git push github HEAD $(PUSH_OPT)
