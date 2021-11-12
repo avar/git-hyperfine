@@ -84,5 +84,6 @@ install-bin: $(SRC)
 .PHONY: install
 install: install-man install-bin
 
+.PHONY: clean
 clean:
 	$(RM) -r .build
