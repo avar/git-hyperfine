@@ -83,7 +83,7 @@ install-bin: $(SRC)
 	$(INSTALL) $< $(DESTDIR)$(bindir)
 
 .PHONY: install
-install: install-man install-bin
+install: install-bin
 
 .PHONY: clean
 clean:
