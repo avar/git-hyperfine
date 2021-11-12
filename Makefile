@@ -35,6 +35,7 @@ mandir = $(prefix)/share/man
 man1dir = $(mandir)/man1
 
 INSTALL = install
+ASCIIDOCTOR = asciidoctor
 
 SRC = git-hyperfine
 MAN = $(SRC:%=.build/%.1)
@@ -51,11 +52,11 @@ endef
 
 .build/%.1: .build/%.adoc
 	$(call mkdir_p_parent_template)	
-	asciidoctor --trace -b manpage -o - $< >$@
+	$(ASCIIDOCTOR) -b manpage -o - $< >$@
 
 .build/%.xml: .build/%.adoc
 	$(call mkdir_p_parent_template)
-	asciidoctor -b docbook -o - $< >$@
+	$(ASCIIDOCTOR) -b docbook -o - $< >$@
 
 .build/%.md: .build/%.xml
 	pandoc -f docbook -t gfm $< -o - >$@
