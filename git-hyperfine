@@ -19,9 +19,6 @@ debug() {
 	return 1
 }
 
-# Chain-inovking ourselves
-ghf_build_template=
-
 # Out option variables
 trace=
 dry_run=
@@ -58,11 +55,6 @@ do
 	--ghf-trace)
 		trace=t
 		set -x
-		;;
-	--ghf-build-template)
-		ghf_build_template=t
-		shift
-		break
 		;;
 	# I need to explicitly intercept these..
 	-b|--build)
@@ -139,22 +131,6 @@ do
 	esac
 	shift
 done
-
-## We're chain-invoking ourselves to get --build etc. output below,
-## this is to avoid some f the painful shell escaping
-if test -n "$ghf_build_template"
-then
-	cat <<-\EOF
-	git_rev="$(git -C "{git_dir}" rev-parse {rev})" &&
-	if ! test -d "{run_dir}/{rev}"
-	then
-		git worktree add "{run_dir}/{rev}" "{rev}";
-	fi &&
-	git -C "{run_dir}/{rev}" reset --hard $git_rev &&
-	cd "{run_dir}/{rev}"
-	EOF
-	exit 0
-fi
 
 ## Options debug
 debug "getopt: build" $build
@@ -290,26 +266,36 @@ then
 	exit 1
 fi
 
-test -n "$dry_run" && printf "Would have invoke hyperfine(1) as:\n\n" >&2
-${dry_run:+perl -wle 'print "hyperfine \\"; print "\t", "$_" for map {
-	if (s/^\t\t \t\t//g) {
-		s/"/\\"/g;
-		s/\n/ \\\n/mg;
-		s/$/"/; s/^/" \\\n/;
-		s/^(?!")/\t\t/gm;
-	}
-	s/^\t+/\t/s;
+## Templates for the command
+## We're chain-invoking ourselves to get --build etc. output below,
+## this is to avoid some f the painful shell escaping
+ghf_build_template() {
+	cat <<-\EOF |
+	git_rev="$(git -C "{git_dir}" rev-parse {rev})" &&
+	if ! test -d "{run_dir}/{rev}"
+	then
+		git worktree add "{run_dir}/{rev}" "{rev}";
+	fi &&
+	git -C "{run_dir}/{rev}" reset --hard $git_rev &&
+	cd "{run_dir}/{rev}"
+	EOF
+	sed \
+	    -e "s!{run_dir}!$run_dir!g" \
+	    -e "s!{git_dir}!$git_dir!g"
+}
 
-	s/$/ \\/;
-	$_
-} @ARGV[1..$#ARGV]' -- } \
+## Debug utility
+emit_dry_run() {
+	printf "Would have invoke hyperfine(1) as:\n\n" >&2
+	# TODO: Do something more clever
+	printf "%s\n" $@
+}
+
+${dry_run:+emit_dry_run} \
 hyperfine $hyperfine_opt \
-	--build "\
+	--build " \
 		${ghf_trace:+set -x;} \
-		$(git hyperfine \
-			--ghf-build-template | sed -E \
-			-e 's!\{run_dir\}!'$run_dir'!g' \
-			-e 's!\{git_dir\}!'$git_dir'!g') \
+		$(ghf_build_template) \
 		${build:+ && $build} \
 	" \
 	${prepare:+ --prepare "\
