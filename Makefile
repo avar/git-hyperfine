@@ -99,6 +99,13 @@ push-gitlab: README.md
 push-github: README.md
 	! git status --porcelain -- $< | grep .
 	git push github HEAD $(PUSH_OPT)
+.PHONY: commit-README.md
+commit-README.md: README.md
+	if ! git status --porcelain -- README.md; \
+	then\
+		git add $< && \
+		git commit -m"$<: bump"; \
+	fi
 .PHONY:
-push-git: push-gitlab push-github
+push-git: commit-README.md push-gitlab push-github
 	@echo Use \"$(MAKE) $@ PUSH_OPT=\" to push for real
