@@ -110,7 +110,7 @@ push-github: README.md
 	git push github HEAD $(PUSH_OPT)
 .PHONY: commit-README.md
 commit-README.md: README.md
-	if ! git status --porcelain -- README.md; \
+	if git status --porcelain -- README.md  | grep -F $<; \
 	then\
 		git add $< && \
 		git commit -m"$<: bump"; \
