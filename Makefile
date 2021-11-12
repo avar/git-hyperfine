@@ -88,3 +88,17 @@ install: install-bin
 .PHONY: clean
 clean:
 	$(RM) -r .build
+
+## Maintainer options
+PUSH_OPT = --dry-run
+.PHONY: push-gitlab
+push-gitlab: README.md
+	! git status --porcelain -- $< | grep .
+	git push origin HEAD $(PUSH_OPT)
+.PHONY:  push-github
+push-github: README.md
+	! git status --porcelain -- $< | grep .
+	git push github HEAD $(PUSH_OPT)
+.PHONY:
+push-git: push-gitlab push-github
+	@echo Use \"$(MAKE) $@ PUSH_OPT=\" to push for real
