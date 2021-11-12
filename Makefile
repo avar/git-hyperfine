@@ -37,7 +37,8 @@ man1dir = $(mandir)/man1
 INSTALL = install
 
 SRC = git-hyperfine
-MAN = $(SRC:%=%.1)
+MAN = $(SRC:%=.build/%.1)
+XML = $(SRC:%=.build/%.xml)
 
 # Advanced mkdir technology stolen from my git.git changes
 define mkdir_p_parent_template
@@ -52,7 +53,24 @@ endef
 	$(call mkdir_p_parent_template)	
 	asciidoctor --trace -b manpage -o - $< >$@
 
-all: .build/$(SRC).1
+.build/%.xml: .build/%.adoc
+	$(call mkdir_p_parent_template)
+	asciidoctor -b docbook -o - $< >$@
+
+.build/%.md: .build/%.xml
+	pandoc -f docbook -t gfm $< -o - >$@
+
+README.md: .build/$(SRC).md
+	cp $< $@
+
+.PHONY: doc
+doc: $(XML)
+
+.PHONY: man
+man: $(MAN)
+
+.PHONY: all
+all: man doc
 
 .PHONY: install-man
 install-man: .build/$(MAN)
