@@ -21,6 +21,8 @@ debug() {
 # Out option variables
 trace=
 dry_run=
+worktree_list=
+worktree_xargs=
 
 # "Our" option variables
 build=
@@ -54,6 +56,16 @@ do
 	--ghf-trace)
 		trace=t
 		set -x
+		;;
+	--ghf-worktree-xargs)
+		worktree_xargs=t
+		shift
+		break
+		;;
+	--ghf-worktree-list)
+		worktree_list=t
+		shift
+		break
 		;;
 	# I need to explicitly intercept these..
 	-b|--build)
@@ -150,6 +162,27 @@ debug "config: run-dir: <$run_dir>"
 ## our {run_dir}.
 git_dir=$(git rev-parse --absolute-git-dir)
 
+## --ghf-worktree-list
+worktree_list () {
+	# I can't remember how to do this with just sed(1), but you
+	# can.
+	git worktree list --porcelain --porcelain |
+	grep "^worktree $run_dir" |
+	sed 's/^worktree //'
+}
+if test -n "$worktree_list"
+then
+	worktree_list
+	exit 0
+fi
+
+## --ghf-worktree-xargs
+if test -n "$worktree_xargs"
+then
+	worktree_list | xargs -n 1 git worktree $@
+	exit 0
+fi
+
 ## --version output specific to git-hyperfine
 if test -n "$version"
 then
@@ -227,16 +260,36 @@ All options that 'git-hyperfine' interprets are prefixed with
 man:hyperfine[1]. We'll change some of them as noted in
 <<ALTOPT,ALTERED OPTIONS>>.
 
---ghc-debug::
+--ghf-debug::
 	Emit debugging messages about what we're doing internally.
 
---ghc-trace::
+--ghf-trace::
 	Intrument generated code with "set -x". For use with
 	man:git-hyperfine[1]'s '--show-output'.
 
---ghc-dry-run::
+--ghf-dry-run::
 	Don't run the man:git-hyperfine[1] command, show what would
 	have been run.
+
+--ghf-worktree-list::
+	A convenience wrapper, runs man:git-worktree[1] with 'list
+	--porcelain' and emits only those paths configured under our
+	'hyperfine-run-dir' prefix. Useful for e.g.:
++
+----
+git hyperfine --ghf-worktree-list | xargs -n 1 git worktree remove
+----
+
+--ghf-worktree-xargs::
+
+	A convenience wrapper for piping 'ghf-worktree-list to the
+	above man:xargs[1] command. Use it as e.g:
++
+----
+git hyperfine --ghf-worktree-xargs remove
+----
++
+Which will be the equivalent of the above command.
 
 ALTERED OPTIONS[[ALTOPT]]
 -------------------------
