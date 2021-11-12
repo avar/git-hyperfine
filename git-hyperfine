@@ -151,45 +151,6 @@ debug "getopt: hyperfine opts" $hyperfine_opt
 debug "getopt: hyperfine command" $command
 debug "getopt: hyperfine command_name" $command_name
 
-## Configuration:
-##
-##	hyperfine.runtime-dir: eval'd; usually set to: $XDG_RUNTIME_DIR
-run_dir=$(git config --get hyperfine.run-dir)
-eval "run_dir=$run_dir"
-debug "config: run-dir: <$run_dir>"
-
-## We need to resolve the {rev} from the originating repository. Not
-## our {run_dir}.
-git_dir=$(git rev-parse --absolute-git-dir)
-
-## --ghf-worktree-list
-worktree_list () {
-	# I can't remember how to do this with just sed(1), but you
-	# can.
-	git worktree list --porcelain --porcelain |
-	grep "^worktree $run_dir" |
-	sed 's/^worktree //'
-}
-if test -n "$worktree_list"
-then
-	worktree_list
-	exit 0
-fi
-
-## --ghf-worktree-xargs
-if test -n "$worktree_xargs"
-then
-	worktree_list | xargs -n 1 git worktree $@
-	exit 0
-fi
-
-## --version output specific to git-hyperfine
-if test -n "$version"
-then
-	echo git-hyperfine version whatever
-	exit 0
-fi
-
 ## --help output specific to git-hyperfine
 if test -n "$help"
 then
@@ -400,6 +361,18 @@ make man
 sudo make install-man prefix=/usr
 ---
 
+HIPSTER INSTALLATION
+--------------------
+
+Like piping random code from the Internetz to man:sudo[1]? This one's
+for you:
+
+----
+sudo make HIPSTER=Y install install-man -f <(curl -s -o - https://gitlab.com/avar/git-hyperfine/-/raw/master/Makefile)
+----
+
+It even requires /bin/bash or /bin/zsh to be installed & running.
+
 LICENSE
 -------
 
@@ -416,6 +389,45 @@ SEE ALSO
 
 man:hyperfine[1]
 EOF
+	exit 0
+fi
+
+## Configuration:
+##
+##	hyperfine.runtime-dir: eval'd; usually set to: $XDG_RUNTIME_DIR
+run_dir=$(git config --get hyperfine.run-dir)
+eval "run_dir=$run_dir"
+debug "config: run-dir: <$run_dir>"
+
+## We need to resolve the {rev} from the originating repository. Not
+## our {run_dir}.
+git_dir=$(git rev-parse --absolute-git-dir)
+
+## --ghf-worktree-list
+worktree_list () {
+	# I can't remember how to do this with just sed(1), but you
+	# can.
+	git worktree list --porcelain --porcelain |
+	grep "^worktree $run_dir" |
+	sed 's/^worktree //'
+}
+if test -n "$worktree_list"
+then
+	worktree_list
+	exit 0
+fi
+
+## --ghf-worktree-xargs
+if test -n "$worktree_xargs"
+then
+	worktree_list | xargs -n 1 git worktree $@
+	exit 0
+fi
+
+## --version output specific to git-hyperfine
+if test -n "$version"
+then
+	echo git-hyperfine version whatever
 	exit 0
 fi
 

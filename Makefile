@@ -46,6 +46,15 @@ define mkdir_p_parent_template
 $(if $(wildcard $(@D)),,$(shell mkdir -p $(@D)))
 endef
 
+# This Makefile supports YOLO installation from the Internetz
+ifdef HIPSTER
+CURL = curl -s
+HIPSTER_URI = https://gitlab.com/avar/git-hyperfine/-/raw/master/git-hyperfine
+$(SRC):
+	$(CURL) -o $@ $(HIPSTER_URI)
+	chmod +x $@
+endif
+
 .build/%.adoc: $(SRC)
 	$(call mkdir_p_parent_template)
 	./$< --help >$@
