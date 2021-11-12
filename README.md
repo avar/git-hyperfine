@@ -50,16 +50,31 @@ All options that *git-hyperfine* interprets are prefixed with *--ghf-*.
 Any other option is passed through to man:hyperfine\[1\]. We’ll change
 some of them as noted in [ALTERED OPTIONS](#ALTOPT).
 
-  - \--ghc-debug  
+  - \--ghf-debug  
     Emit debugging messages about what we’re doing internally.
 
-  - \--ghc-trace  
+  - \--ghf-trace  
     Intrument generated code with "set -x". For use with
     man:git-hyperfine\[1\]*s '--show-output*.
 
-  - \--ghc-dry-run  
+  - \--ghf-dry-run  
     Don’t run the man:git-hyperfine\[1\] command, show what would have
     been run.
+
+  - \--ghf-worktree-list  
+    A convenience wrapper, runs man:git-worktree\[1\] with *list
+    --porcelain* and emits only those paths configured under our
+    *hyperfine-run-dir* prefix. Useful for e.g.:
+    
+        git hyperfine --ghf-worktree-list | xargs -n 1 git worktree remove
+
+  - \--ghf-worktree-xargs  
+    A convenience wrapper for piping 'ghf-worktree-list to the above
+    man:xargs\[1\] command. Use it as e.g:
+    
+        git hyperfine --ghf-worktree-xargs remove
+    
+    Which will be the equivalent of the above command.
 
 # ALTERED OPTIONS
 
