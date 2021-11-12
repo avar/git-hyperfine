@@ -368,7 +368,7 @@ Like piping random code from the Internetz to man:sudo[1]? This one's
 for you:
 
 ----
-sudo make HIPSTER=Y install install-man -f <(curl -s -o - https://gitlab.com/avar/git-hyperfine/-/raw/master/Makefile)
+sudo bash -c "make prefix=$HOME/local HIPSTER=Y install install-man -f<(curl -s -o - https://gitlab.com/avar/git-hyperfine/-/raw/master/Makefile)"
 ----
 
 It even requires /bin/bash or /bin/zsh to be installed & running.

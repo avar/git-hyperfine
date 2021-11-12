@@ -89,6 +89,9 @@ install-man: .build/$(MAN)
 
 .PHONY: install-bin
 install-bin: $(SRC)
+ifdef HIPSTER
+	$(INSTALL) -d -m 755 $(prefix)
+endif
 	$(INSTALL) $< $(DESTDIR)$(bindir)
 
 .PHONY: install
