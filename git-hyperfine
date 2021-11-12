@@ -187,8 +187,6 @@ It needs the --build option from
 https://github.com/sharkdp/hyperfine/pull/448, and can benefit from
 '-r 1' as well: https://github.com/sharkdp/hyperfine/pull/447
 
-To use it you must, instead of:
-
 To test say a <git-revisions> of 'HEAD~1,HEAD~0' well resolve those
 comma-delimited revisions in the current working directory (which is
 assumed to be a git repository, or we'll die).
@@ -230,6 +228,10 @@ man:hyperfine[1]. We'll change some of them as noted in
 	Intrument generated code with "set -x". For use with
 	man:git-hyperfine[1]'s '--show-output'.
 
+--ghc-dry-run::
+	Don't run the man:git-hyperfine[1] command, show what would
+	have been run.
+
 ALTERED OPTIONS[[ALTOPT]]
 -------------------------
 
@@ -237,13 +239,114 @@ ALTERED OPTIONS[[ALTOPT]]
 	 Your '--build' command (if any) will be chained behind the
 	 build command we'll use to setup the man:git-worktree[1].
 +
-
 All of these will be passed through as-is, except we'll add a thin
 wrapper of 'cd <run-dir> && ...'.
+
+-L, --parameter-list::
+	Passed through as-is, except as a sanity check we'll die if
+	you don't create a '-L rev ...' option. Our '--build' option
+	requires it to work.
+
+-n, --command-name::
+	You're not allowed to supply this anymore, as we'll need it to
+	relabel our ugly generated 'cd <x> && ...' command name.
+
+CONFIGURATION
+-------------
+
+This command can be configured through man:git-config[1], all the
+options are in the 'hyperfine.*' namespace:
+
+hyperfine.run-dir::
+
+	Mandatory configuration which determines where to place the
+	man:git-worktree[1] trees we create for resting the '{rev}'
+	arguments.
++
+Environment variables are supported, they're not understood by
+man:git-config[1], but we'll shell 'eval()' this value.
++
+A good setting would be:
++
+----
+[hyperfine]
+run-dir = $XDG_RUNTIME_DIR/git-perf
+----
+
+EXAMPLES
+--------
+
+Test two revisions, and show that w we'll run in our worktree paths:
 
 ----
 git hyperfine -L rev HEAD,HEAD~ -r 2 -b 'echo build: $(pwd)' 'echo run: $(pwd)' -c 'echo cleanup: $(pwd)' -p 'echo prepare: $(pwd)' --show-output
 ----
+
+DEPENDENCIES
+------------
+
+POSIX shell script. See <<COMPAT,COMPATIBILITY>> below.
+
+To install documentation you'll need man:asciidoctor[1].
+
+COMPATIBILITY[[COMPAT]]
+-----------------------
+
+'git-hyperfine' is written in POSIX shellscript. It should be
+compatible with Linux systems, BSDs, OSX, Solaris (not /bin/sh
+though), AIX, HP/UX etc. etc. Any incompatibility is a (probably small
+and easily fixed) bug.
+
+BUGS
+----
+
+If man:hyperfine[1] introduces a new option 'git-hyperfine' currently
+needs to be updated to know how to pass it through (its option usage
+is somewhat irregular).
+
+AUTHOR
+------
+
+Ævar Arnfjörð Bjarmason
+
+INSTALLATION
+------------
+
+"git clone" the repository and add it to your '$PATH' for a quick
+try-out (or don't add it to '$PATH' and provide the full path name).
+
+For a proper installation there's an old-school GNU make 'Makefile' in
+the top-level, to build and see what we'd install do:
+
+----
+make install INSTALL='@echo install'
+----
+
+And to install it for real drop the 'INSTALL' parameter, e.g.:
+
+----
+sudo make install prefix=/usr
+----
+
+To build and install documentation add 'install-man' to that (only the
+latter target is needed). Tweak 'ASCIIDOCTOR' to be the path to your
+'asciidoctor' (or compatible) program.
+
+---
+make man
+sudo make install-man prefix=/usr
+---
+
+LICENSE
+-------
+
+'git-hyperfine' is triple-licensed under GPL v2.0 or later, MIT
+License, and Apache License 2.0 or later.
+
+I.e. a more than generous combination of the licenses of upstream
+utilities it uses and extends. See
+https://github.com/sharkdp/hyperfine/#license and
+https://github.com/git/git/blob/master/COPYING
 
 SEE ALSO
 --------
