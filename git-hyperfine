@@ -1,0 +1,330 @@
+#!/bin/sh
+#
+# git-hyperfine: thing wrapper around hyperfine(1). See --help output
+# below.
+
+ghf=$(basename "$0")
+debug=
+debug() {
+	if test -n "$debug"
+	then
+		if test $# -gt 0
+		then
+			prefix=$1
+			shift
+			printf "debug: $prefix: %s\n" $@
+		fi
+		return 0
+	fi
+	return 1
+}
+
+# Chain-inovking ourselves
+ghf_build_template=
+
+# Out option variables
+trace=
+dry_run=
+
+# "Our" option variables
+build=
+prepare=
+cleanup=
+command=
+command_name=
+
+# "Our' options variables, intecepted (TODO)
+help=
+version=
+
+# Pass-through to hyperfine(1)
+hyperfine_opt=
+hyperfine_output_opt=
+
+# Pass-through to hyperfine(1), but validate
+saw_rev=
+
+while test $# -gt 0
+do
+	#debug "getopt: processing" $1
+	case "$1" in
+	# git-hyperfine's own options
+	--ghf-debug)
+		debug=t
+		;;
+	--ghf-dry-run)
+		dry_run=t
+		;;
+	--ghf-trace)
+		trace=t
+		set -x
+		;;
+	--ghf-build-template)
+		ghf_build_template=t
+		shift
+		break
+		;;
+	# I need to explicitly intercept these..
+	-b|--build)
+		build=$2
+		shift
+		;;
+	-p|-prepare)
+		prepare=$2
+		shift
+		;;
+	-c|--cleanup)
+		cleanup=$2
+		shift
+		;;
+	-n|--command-name)
+		command_name=$2
+		shift
+		;;
+
+	# ... but not really these. TODO: Better way to do passthrough
+	# "and" understand <command> than to re-parse every option it
+	# understands?
+	#
+	# Probably not, I'll need to know if -L <x> <y> has <y> as a
+	# <command> or argument for -L.
+	-P|--parameter-scan)
+		# Options for hyperfine(1) with three params
+		hyperfine_opt="${hyperfine_opt:+$hyperfine_opt }$1 $2 $3 #4"
+		shift 3
+		;;
+	# Options for hyperfine(1) with two params
+	-L|--parameter-list)
+		if test "$2" = "rev"
+		then
+			saw_rev=t
+		fi
+		hyperfine_opt="${hyperfine_opt:+$hyperfine_opt }$1 $2 $3"
+		shift 2
+		;;
+	# Options for hyperfine(1) with one param.
+	-w|--warmup| \
+	-m|--min-runs| \
+	-M|--max-runs| \
+	-r|--runs| \
+	-s|--style| \
+	-D|--parameter-step-size| \
+	-S|--shell| \
+	-u|--time-unit| \
+	--export-asciidoc| \
+	--export-csv| \
+	--export-markdown| \
+	--export-json)
+		hyperfine_opt="${hyperfine_opt:+$hyperfine_opt }$1 $2"
+		shift
+		;;
+	# Options for hyperfine(1) without params
+	-i|--ignore-failure| \
+	--show-output)
+		hyperfine_opt="${hyperfine_opt:+$hyperfine_opt }$1"
+		;;
+	# Output options for hyperfine(1) without params
+	-h|--help)
+		help=t
+		hyperfine_output_opt="${hyperfine_output_opt:+$hyperfine_output_opt }$1"
+		;;
+	-v|--version)
+		version=t
+		hyperfine_output_opt="${hyperfine_output_opt:+$hyperfine_output_opt }$1"
+		;;
+	*)
+		# Intercept hyperfine(1) <command>
+		command="${command:+$command }$1"
+		;;
+	esac
+	shift
+done
+
+## We're chain-invoking ourselves to get --build etc. output below,
+## this is to avoid some f the painful shell escaping
+if test -n "$ghf_build_template"
+then
+	cat <<-\EOF
+	git_rev="$(git -C "{git_dir}" rev-parse {rev})" &&
+	if ! test -d "{run_dir}/{rev}"
+	then
+		git worktree add "{run_dir}/{rev}" "{rev}";
+	fi &&
+	git -C "{run_dir}/{rev}" reset --hard $git_rev &&
+	cd "{run_dir}/{rev}"
+	EOF
+	exit 0
+fi
+
+## Options debug
+debug "getopt: build" $build
+debug "getopt: prepare" $prepare
+debug "getopt: cleanup" $cleanup
+debug "getopt: hyperfine opts" $hyperfine_opt
+debug "getopt: hyperfine command" $command
+debug "getopt: hyperfine command_name" $command_name
+
+## Configuration:
+##
+##	hyperfine.runtime-dir: eval'd; usually set to: $XDG_RUNTIME_DIR
+run_dir=$(git config --get hyperfine.run-dir)
+eval "run_dir=$run_dir"
+debug "config: run-dir: <$run_dir>"
+
+## We need to resolve the {rev} from the originating repository. Not
+## our {run_dir}.
+git_dir=$(git rev-parse --absolute-git-dir)
+
+## --help output specific to git-hyperfine
+if test -n "$help"
+then
+	cat <<-\EOF
+git-hyperfine(1)
+================
+
+NAME
+----
+git-hyperfine(1) - wrapper around man:hyperfine[1], intercepts -L '<rev>', benchmarks git revisions
+
+SYNOPSIS
+--------
+
+Instead of:
+
+----
+hyperfine [<hyperfine-options>]
+----
+
+Do:
+
+----
+git hyperfine -L rev <git-revisions> [<hyperfine-options>]
+----
+
+DESCRIPTION
+-----------
+
+This is a wrapper around man:hyperfine[1] which intercepts '-L rev
+<git-revisions>' and sets up a git-worktree(1) for each one.
+
+It needs the --build option from
+https://github.com/sharkdp/hyperfine/pull/448, and can benefit from
+'-r 1' as well: https://github.com/sharkdp/hyperfine/pull/447
+
+To use it you must, instead of:
+
+To test say a <git-revisions> of 'HEAD~1,HEAD~0' well resolve those
+comma-delimited revisions in the current working directory (which is
+assumed to be a git repository, or we'll die).
+
+We'll then expect a 'hyperfine.run-dir' in your git-config(1) of
+e.g. (we'll 'eval' it, so you can use an env variable name):
+
+----
+[hyperfine]
+run-dir = $XDG_RUNTIME_DIR/git-perf
+----
+
+Which, on e.g. modern systemd-using system will resolve to a ramdisk
+directory such as '/run/user/1001/git-perf'. We'll then create (with
+'git worktree add') both of:
+
+----
+/run/user/1001/git-perf/HEAD~0
+/run/user/1001/git-perf/HEAD~1
+----
+
+Note that we use those literal names, i.e. 'HEAD~0', not whatever 'git
+rev-parse HEAD~0'. This is so that we won't create an arbitrary number
+of directories. We'll expect that you can re-use them if you keep
+testing the last N revisions.
+
+OPTIONS
+-------
+
+All options that 'git-hyperfine' interprets are prefixed with
+'--ghf-'. Any other option is passed through to
+man:hyperfine[1]. We'll change some of them as noted in
+<<ALTOPT,ALTERED OPTIONS>>.
+
+--ghc-debug::
+	Emit debugging messages about what we're doing internally.
+
+--ghc-trace::
+	Intrument generated code with "set -x". For use with
+	man:git-hyperfine[1]'s '--show-output'.
+
+ALTERED OPTIONS[[ALTOPT]]
+-------------------------
+
+--build, --prepare, <command>::
+	 Your '--build' command (if any) will be chained behind the
+	 build command we'll use to setup the man:git-worktree[1].
++
+
+All of these will be passed through as-is, except we'll add a thin
+wrapper of 'cd <run-dir> && ...'.
+
+----
+git hyperfine -L rev HEAD,HEAD~ -r 2 -b 'echo build: $(pwd)' 'echo run: $(pwd)' -c 'echo cleanup: $(pwd)' -p 'echo prepare: $(pwd)' --show-output
+----
+
+SEE ALSO
+--------
+
+man:hyperfine[1]
+EOF
+	exit 0
+fi
+
+## Options sanity check
+if test -z "$saw_rev"
+then
+	echo "$ghf needs a -L rev <rev>..., e.g. -L rev HEAD~1,HEAD~0" >&2
+	exit 1
+fi
+
+if test -n "$command_name"
+then
+	echo "$ghf can't take your -n|--command-name $command_name. It needs it" >&2
+	exit 1
+fi
+
+test -n "$dry_run" && printf "Would have invoke hyperfine(1) as:\n\n" >&2
+${dry_run:+perl -wle 'print "hyperfine \\"; print "\t", "$_" for map {
+	if (s/^\t\t \t\t//g) {
+		s/"/\\"/g;
+		s/\n/ \\\n/mg;
+		s/$/"/; s/^/" \\\n/;
+		s/^(?!")/\t\t/gm;
+	}
+	s/^\t+/\t/s;
+
+	s/$/ \\/;
+	$_
+} @ARGV[1..$#ARGV]' -- } \
+hyperfine $hyperfine_opt \
+	--build "\
+		${ghf_trace:+set -x;} \
+		$(git hyperfine \
+			--ghf-build-template | sed -E \
+			-e 's!\{run_dir\}!'$run_dir'!g' \
+			-e 's!\{git_dir\}!'$git_dir'!g') \
+		${build:+ && $build} \
+	" \
+	${prepare:+ --prepare "\
+		${ghf_trace:+set -x;} \
+		cd \"$run_dir/{rev}\" &&
+		$prepare \
+	"} \
+	${cleanup:+ --cleanup "\
+		${ghf_trace:+set -x;} \
+		cd \"$run_dir/{rev}\" &&
+		$cleanup \
+	"} \
+	${command:+--command-name="$(tput setaf 6)$command$(tput sgr0)' in '$(tput setaf 6){rev}$(tput sgr0)"  \
+	"\
+		${ghf_trace:+set -x;} \
+		cd \"$run_dir/{rev}\" &&
+		$command \
+	"}
