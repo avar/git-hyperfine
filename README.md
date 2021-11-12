@@ -165,6 +165,15 @@ latter target is needed). Tweak *ASCIIDOCTOR* to be the path to your
 
 make man sudo make install-man prefix=/usr ---
 
+# HIPSTER INSTALLATION
+
+Like piping random code from the Internetz to man:sudo\[1\]? This one’s
+for you:
+
+    sudo make HIPSTER=Y install install-man -f <(curl -s -o - https://gitlab.com/avar/git-hyperfine/-/raw/master/Makefile)
+
+It even requires /bin/bash or /bin/zsh to be installed & running.
+
 # LICENSE
 
 *git-hyperfine* is triple-licensed under GPL v2.0 or later, MIT License,
