@@ -71,6 +71,7 @@ endif
 	pandoc -f docbook -t gfm $< -o - >$@
 
 README.md: .build/$(SRC).md
+	sh -c '. $$(git --exec-path)/git-sh-setup; require_clean_work_tree "commit"'
 	cp $< $@
 
 .PHONY: doc
@@ -105,20 +106,22 @@ clean:
 PUSH_OPT = --dry-run
 .PHONY: push-gitlab
 push-gitlab: README.md
-	! git status --porcelain -- $< | grep .
 	git push gitlab HEAD $(PUSH_OPT)
 
 .PHONY: push-github
 push-github: README.md
-	! git status --porcelain -- $< | grep .
 	git push github HEAD $(PUSH_OPT)
 .PHONY: commit-README.md
 commit-README.md: README.md
-	if git status --porcelain -- README.md  | grep -F $<; \
+	git add $<
+	if ! git diff --quiet --staged -- $<; \
 	then\
-		git add $< && \
 		git commit -m"$<: bump"; \
 	fi
 .PHONY:
 push-git: commit-README.md push-gitlab push-github
+	@echo Pushing with \"$(MAKE) $@ PUSH_OPT=\"
+ifdef PUSH_OPT
 	@echo Use \"$(MAKE) $@ PUSH_OPT=\" to push for real
+	exit 1
+endif

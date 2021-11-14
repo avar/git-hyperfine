@@ -187,3 +187,4 @@ utilities it uses and extends. See
 # SEE ALSO
 
 man:hyperfine\[1\]
+hi
