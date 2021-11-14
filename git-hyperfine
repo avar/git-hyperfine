@@ -67,6 +67,10 @@ do
 		shift
 		break
 		;;
+	--ghf-*)
+		echo "git-hyperfine: unknown option $1" >&2
+		exit 1
+		;;
 	# I need to explicitly intercept these..
 	-s|--setup)
 		setup=$2
