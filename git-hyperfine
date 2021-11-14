@@ -316,17 +316,10 @@ To install documentation you'll need man:asciidoctor[1].
 COMPATIBILITY[[COMPAT]]
 -----------------------
 
-'git-hyperfine' is written in POSIX shellscript. It should be
-compatible with Linux systems, BSDs, OSX, Solaris (not /bin/sh
+'git-hyperfine' is written in in POSIX shellscript. It should be
+compatible with Linux systems, BSDs, OSX, Solaris (not its /bin/sh
 though), AIX, HP/UX etc. etc. Any incompatibility is a (probably small
 and easily fixed) bug.
-
-BUGS
-----
-
-If man:hyperfine[1] introduces a new option 'git-hyperfine' currently
-needs to be updated to know how to pass it through (its option usage
-is somewhat irregular).
 
 AUTHOR
 ------
@@ -353,16 +346,16 @@ sudo make install prefix=/usr
 ----
 
 To build and install documentation add 'install-man' to that (only the
-latter target is needed). Tweak 'ASCIIDOCTOR' to be the path to your
-'asciidoctor' (or compatible) program.
+latter target is needed). You can provide 'ASCIIDOCTOR' to be the path
+to your 'asciidoctor' (or compatible) program.
 
 ---
 make man
 sudo make install-man prefix=/usr
 ---
 
-HIPSTER INSTALLATION
---------------------
+HIPSTER INSTALLATION[[HIPSTER]]
+-------------------------------
 
 Like piping random code from the Internetz to man:sudo[1]? This one's
 for you:
@@ -371,7 +364,21 @@ for you:
 sudo bash -c "make prefix=$HOME/local HIPSTER=Y install install-man -f<(curl -s -o - https://gitlab.com/avar/git-hyperfine/-/raw/master/Makefile)"
 ----
 
-It even requires /bin/bash or /bin/zsh to be installed & running.
+It doesn't even require man:bash[1] (or man:sudo[1]), but if you like
+to live dangerously.
+
+BUGS
+----
+
+If man:hyperfine[1] introduces a new option 'git-hyperfine' currently
+needs to be updated to know how to pass it through (its option usage
+is somewhat irregular).
+
+
+<<HIPSTER,HIPSTER INSTALLATION>> mode will cache the downloaded
+program in the current working directory by virtue of being a
+functioning 'Makefile' under the hood. It should probably download a
+1GB tarball from somewhere instead to provide the full experience.
 
 LICENSE
 -------
