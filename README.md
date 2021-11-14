@@ -116,6 +116,12 @@ options are in the *hyperfine.\** namespace:
         [hyperfine]
         run-dir = $XDG_RUNTIME_DIR/git-perf
 
+See the *git-hyperfine-gitconfig.cfg* file in the *git-hyperfine*
+repository for configuration examples. That’s also available at
+<https://gitlab.com/avar/git-hyperfine/-/blob/master/git-hyperfine-gitconfig.cfg>
+and
+<https://github.com/avar/git-hyperfine/blob/master/git-hyperfine-gitconfig.cfg>
+
 # EXAMPLES
 
 Test two revisions, and show that w we’ll run in our worktree paths:
