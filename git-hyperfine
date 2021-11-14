@@ -25,7 +25,7 @@ worktree_list=
 worktree_xargs=
 
 # "Our" option variables
-build=
+setup=
 prepare=
 cleanup=
 command=
@@ -68,8 +68,8 @@ do
 		break
 		;;
 	# I need to explicitly intercept these..
-	-b|--build)
-		build=$2
+	-s|--setup)
+		setup=$2
 		shift
 		;;
 	-p|-prepare)
@@ -110,7 +110,7 @@ do
 	-m|--min-runs| \
 	-M|--max-runs| \
 	-r|--runs| \
-	-s|--style| \
+	--style| \
 	-D|--parameter-step-size| \
 	-S|--shell| \
 	-u|--time-unit| \
@@ -144,7 +144,7 @@ do
 done
 
 ## Options debug
-debug "getopt: build" $build
+debug "getopt: setup" $setup
 debug "getopt: prepare" $prepare
 debug "getopt: cleanup" $cleanup
 debug "getopt: hyperfine opts" $hyperfine_opt
@@ -183,7 +183,7 @@ DESCRIPTION
 This is a wrapper around man:hyperfine[1] which intercepts '-L rev
 <git-revisions>' and sets up a git-worktree(1) for each one.
 
-It needs the --build option from
+It needs the --setup option from
 https://github.com/sharkdp/hyperfine/pull/448, and can benefit from
 '-r 1' as well: https://github.com/sharkdp/hyperfine/pull/447
 
@@ -259,16 +259,16 @@ ALTERED OPTIONS[[ALTOPT]]
 	git-hyperfine's help and version output. The help output is
 	the raw asciidoc of the installed man page.
 
---build, --prepare, <command>::
-	 Your '--build' command (if any) will be chained behind the
-	 build command we'll use to setup the man:git-worktree[1].
+--setup, --prepare, <command>::
+	 Your '--setup' command (if any) will be chained behind the
+	 setup command we'll use to setup the man:git-worktree[1].
 +
 All of these will be passed through as-is, except we'll add a thin
 wrapper of 'cd <run-dir> && ...'.
 
 -L, --parameter-list::
 	Passed through as-is, except as a sanity check we'll die if
-	you don't create a '-L rev ...' option. Our '--build' option
+	you don't create a '-L rev ...' option. Our '--setup' option
 	requires it to work.
 
 -n, --command-name::
@@ -303,7 +303,7 @@ EXAMPLES
 Test two revisions, and show that w we'll run in our worktree paths:
 
 ----
-git hyperfine -L rev HEAD,HEAD~ -r 2 -b 'echo build: $(pwd)' 'echo run: $(pwd)' -c 'echo cleanup: $(pwd)' -p 'echo prepare: $(pwd)' --show-output
+git hyperfine -L rev HEAD,HEAD~ -r 2 -s 'echo setup: $(pwd)' 'echo run: $(pwd)' -c 'echo cleanup: $(pwd)' -p 'echo prepare: $(pwd)' --show-output
 ----
 
 DEPENDENCIES
@@ -445,9 +445,9 @@ then
 fi
 
 ## Templates for the command
-## We're chain-invoking ourselves to get --build etc. output below,
+## We're chain-invoking ourselves to get --setup etc. output below,
 ## this is to avoid some f the painful shell escaping
-ghf_build_template() {
+ghf_setup_template() {
 	cat <<-\EOF |
 	git_rev="$(git -C "{git_dir}" rev-parse {rev})" &&
 	if ! test -d "{run_dir}/{rev}"
@@ -471,10 +471,10 @@ emit_dry_run() {
 
 ${dry_run:+emit_dry_run} \
 hyperfine $hyperfine_opt \
-	--build " \
+	--setup " \
 		${ghf_trace:+set -x;} \
-		$(ghf_build_template) \
-		${build:+ && $build} \
+		$(ghf_setup_template) \
+		${setup:+ && $setup} \
 	" \
 	${prepare:+ --prepare "\
 		${ghf_trace:+set -x;} \
