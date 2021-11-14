@@ -18,7 +18,7 @@ Do:
 This is a wrapper around man:hyperfine\[1\] which intercepts *-L rev
 \<git-revisions\>* and sets up a git-worktree(1) for each one.
 
-It needs the --build option from
+It needs the --setup option from
 <https://github.com/sharkdp/hyperfine/pull/448>, and can benefit from
 *-r 1* as well: <https://github.com/sharkdp/hyperfine/pull/447>
 
@@ -54,7 +54,7 @@ some of them as noted in [ALTERED OPTIONS](#ALTOPT).
     Emit debugging messages about what we’re doing internally.
 
   - \--ghf-trace  
-    Intrument generated code with "set -x". For use with
+    Instrument generated code with "set -x". For use with
     man:git-hyperfine\[1\]*s '--show-output*.
 
   - \--ghf-dry-run  
@@ -82,8 +82,8 @@ some of them as noted in [ALTERED OPTIONS](#ALTOPT).
     git-hyperfine’s help and version output. The help output is the raw
     asciidoc of the installed man page.
 
-  - \--build, --prepare, \<command\>  
-    Your *--build* command (if any) will be chained behind the build
+  - \--setup, --prepare, \<command\>  
+    Your *--setup* command (if any) will be chained behind the setup
     command we’ll use to setup the man:git-worktree\[1\].
     
     All of these will be passed through as-is, except we’ll add a thin
@@ -91,7 +91,7 @@ some of them as noted in [ALTERED OPTIONS](#ALTOPT).
 
   - \-L, --parameter-list  
     Passed through as-is, except as a sanity check we’ll die if you
-    don’t create a *-L rev …​* option. Our *--build* option requires
+    don’t create a *-L rev …​* option. Our *--setup* option requires
     it to work.
 
   - \-n, --command-name  
@@ -120,7 +120,7 @@ options are in the *hyperfine.\** namespace:
 
 Test two revisions, and show that w we’ll run in our worktree paths:
 
-    git hyperfine -L rev HEAD,HEAD~ -r 2 -b 'echo build: $(pwd)' 'echo run: $(pwd)' -c 'echo cleanup: $(pwd)' -p 'echo prepare: $(pwd)' --show-output
+    git hyperfine -L rev HEAD,HEAD~ -r 2 -s 'echo setup: $(pwd)' 'echo run: $(pwd)' -c 'echo cleanup: $(pwd)' -p 'echo prepare: $(pwd)' --show-output
 
 # DEPENDENCIES
 
@@ -130,16 +130,10 @@ To install documentation you’ll need man:asciidoctor\[1\].
 
 # COMPATIBILITY
 
-*git-hyperfine* is written in POSIX shellscript. It should be compatible
-with Linux systems, BSDs, OSX, Solaris (not /bin/sh though), AIX, HP/UX
-etc. etc. Any incompatibility is a (probably small and easily fixed)
-bug.
-
-# BUGS
-
-If man:hyperfine\[1\] introduces a new option *git-hyperfine* currently
-needs to be updated to know how to pass it through (its option usage is
-somewhat irregular).
+*git-hyperfine* is written in in POSIX shellscript. It should be
+compatible with Linux systems, BSDs, OSX, Solaris (not its /bin/sh
+though), AIX, HP/UX etc. etc. Any incompatibility is a (probably small
+and easily fixed) bug.
 
 # AUTHOR
 
@@ -160,8 +154,8 @@ And to install it for real drop the *INSTALL* parameter, e.g.:
     sudo make install prefix=/usr
 
 To build and install documentation add *install-man* to that (only the
-latter target is needed). Tweak *ASCIIDOCTOR* to be the path to your
-*asciidoctor* (or compatible) program.
+latter target is needed). You can provide *ASCIIDOCTOR* to be the path
+to your *asciidoctor* (or compatible) program.
 
 make man sudo make install-man prefix=/usr ---
 
@@ -172,7 +166,19 @@ for you:
 
     sudo bash -c "make prefix=$HOME/local HIPSTER=Y install install-man -f<(curl -s -o - https://gitlab.com/avar/git-hyperfine/-/raw/master/Makefile)"
 
-It even requires /bin/bash or /bin/zsh to be installed & running.
+It doesn’t even require man:bash\[1\] (or man:sudo\[1\]), but if you
+like to live dangerously.
+
+# BUGS
+
+If man:hyperfine\[1\] introduces a new option *git-hyperfine* currently
+needs to be updated to know how to pass it through (its option usage is
+somewhat irregular).
+
+[HIPSTER INSTALLATION](#HIPSTER) mode will cache the downloaded program
+in the current working directory by virtue of being a functioning
+*Makefile* under the hood. It should probably download a 1GB tarball
+from somewhere instead to provide the full experience.
 
 # LICENSE
 
