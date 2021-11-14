@@ -225,7 +225,7 @@ man:hyperfine[1]. We'll change some of them as noted in
 	Emit debugging messages about what we're doing internally.
 
 --ghf-trace::
-	Intrument generated code with "set -x". For use with
+	Instrument generated code with "set -x". For use with
 	man:git-hyperfine[1]'s '--show-output'.
 
 --ghf-dry-run::
