@@ -19,6 +19,7 @@ debug() {
 }
 
 # Out option variables
+debug_trace=
 trace=
 dry_run=
 worktree_list=
@@ -44,25 +45,30 @@ saw_rev=
 
 while test $# -gt 0
 do
-	#debug "getopt: processing" $1
+	debug "getopt: processing" $1
 	case "$1" in
 	# git-hyperfine's own options
 	--ghf-debug)
 		debug=t
 		;;
-	--ghf-dry-run)
-		dry_run=t
+	--ghf-debug-trace)
+		set -x
+		debug_trace=t
 		;;
 	--ghf-trace)
 		trace=t
-		set -x
+		;;
+	--ghf-dry-run)
+		dry_run=t
 		;;
 	--ghf-worktree-xargs)
+		debug "getopt: aborting" $1
 		worktree_xargs=t
 		shift
 		break
 		;;
 	--ghf-worktree-list)
+		debug "getopt: aborting" $1
 		worktree_list=t
 		shift
 		break
@@ -169,31 +175,41 @@ git-hyperfine(1) - wrapper around man:hyperfine[1], intercepts -L '<rev>', bench
 SYNOPSIS
 --------
 
-Instead of:
+[verse]
+git hyperfine [<git-hyperfine-options>] -L rev <comma-delimited-git-revisions> [<hyperfine-options>]
+git hyperfine [<git-hyperfine-options>] -L rev HEAD~1,HEAD~0 -r 1 pwd
+git hyperfine [--ghf-dry-run] --ghf-worktree-xargs [<args>]
+git hyperfine --ghf-worktree-list
 
-----
-hyperfine [<hyperfine-options>]
-----
-
-Do:
-
-----
-git hyperfine -L rev <git-revisions> [<hyperfine-options>]
-----
+See more examples under <<XMPL,EXAMPLES>> below.
 
 DESCRIPTION
 -----------
 
-This is a wrapper around man:hyperfine[1] which intercepts '-L rev
-<git-revisions>' and sets up a git-worktree(1) for each one.
+git-hyperfine is a thin wrapper around man:hyperfine[1] designed to
+make it convenient to benchmark different git revisions within a git
+repository.
+
+It '-L rev <git-revisions>' and sets up a git-worktree(1) for each one
+under a prefix you configure. Providing '-L rev` is mandatory and will
+be used to create the '<path>' fed to 'git worktree add'. We'll then
+wrap man:hyperfine[1] so that any commands are run within this newly
+setup worktree.
+
+The rest of the usage is the same as man:hyperfine[1] itself, but see
+<<OPT,OPTIONS>> and <<ALTOPT,ALTERED OPTIONS>> for extra options on
+top, and details about how we intercept and munge certain options.
 
 It needs the --setup option from
-https://github.com/sharkdp/hyperfine/pull/448, and can benefit from
-'-r 1' as well: https://github.com/sharkdp/hyperfine/pull/447
+https://github.com/sharkdp/hyperfine/pull/448, and some of the
+examples here use the recent (as of late 2021) support for '-r 1'.
+
+DISCUSSION
+----------
 
 To test say a <git-revisions> of 'HEAD~1,HEAD~0' well resolve those
-comma-delimited revisions in the current working directory (which is
-assumed to be a git repository, or we'll die).
+comma-delimited revisions in the current working directory. You're
+assumed to be running this within git repository, if not we'll die.
 
 We'll then expect a 'hyperfine.run-dir' in your git-config(1) of
 e.g. (we'll 'eval' it, so you can use an env variable name):
@@ -214,23 +230,16 @@ directory such as '/run/user/1001/git-perf'. We'll then create (with
 
 Note that we use those literal names, i.e. 'HEAD~0', not whatever 'git
 rev-parse HEAD~0'. This is so that we won't create an arbitrary number
-of directories. We'll expect that you can re-use them if you keep
-testing the last N revisions.
+of directories over multiple runs. We'll expect that you can re-use
+them if you keep testing the last N revisions.
 
-OPTIONS
--------
+OPTIONS[[OPT]]
+--------------
 
 All options that 'git-hyperfine' interprets are prefixed with
 '--ghf-'. Any other option is passed through to
 man:hyperfine[1]. We'll change some of them as noted in
 <<ALTOPT,ALTERED OPTIONS>>.
-
---ghf-debug::
-	Emit debugging messages about what we're doing internally.
-
---ghf-trace::
-	Instrument generated code with "set -x". For use with
-	man:git-hyperfine[1]'s '--show-output'.
 
 --ghf-dry-run::
 	Don't run the man:git-hyperfine[1] command, show what would
@@ -246,18 +255,42 @@ git hyperfine --ghf-worktree-list | xargs -n 1 git worktree remove
 ----
 
 --ghf-worktree-xargs::
-
-	A convenience wrapper for piping 'ghf-worktree-list to the
-	above man:xargs[1] command. Use it as e.g:
+	A convenience wrapper for piping '--ghf-worktree-list' output
+	to man:xargs[1]. Equivalent to:
 +
 ----
-git hyperfine --ghf-worktree-xargs remove
+git hyperfine --ghf-worktree-list | xargs -n 1 $(git config hyperfine.xargs-options) <your command>
 ----
 +
-Which will be the equivalent of the above command.
+Use it as e.g.:
++
+----
+git hyperfine --ghf-worktree-xargs git worktree remove
+----
++
+To clean up the worktrees which git-hyperfine will create for running
+benchmarks.
++
+Under '--dry-run' we inject an 'echo' before whatever command it is
+you wanted to run.
 
-ALTERED OPTIONS[[ALTOPT]]
+--ghf-trace::
+	Instrument generated code with "set -x". For use with
+	man:git-hyperfine[1]'s '--show-output'.
+
+--ghf-debug, --ghf-debug-trace::
+	For debugging git-hyperfine itself. '--ghf-debug' shows debug
+	output about option parsing etc. The '--ghf-debug-trace' turn
+	on 'set -x' for git-hyperfine itself, as opposed to
+	'--ghf-trace' which'll only do it for your code.
+
+ALTERED OPTIONS[[altopt]]
 -------------------------
+
+<command>:
+	In addition to being altered for link:git-worktree[1] use this
+	is optional if 'hyperfine.hook.command' is defined. See
+	<<HOOKCFG,HOOK CONFIGURATION>>.
 
 --help, --version::
 	git-hyperfine's help and version output. The help output is
@@ -285,8 +318,10 @@ CONFIGURATION
 This command can be configured through man:git-config[1], all the
 options are in the 'hyperfine.*' namespace:
 
-hyperfine.run-dir::
+MANDATORY CONFIGURATION
+~~~~~~~~~~~~~~~~~~~~~~~
 
+hyperfine.run-dir::
 	Mandatory configuration which determines where to place the
 	man:git-worktree[1] trees we create for resting the '{rev}'
 	arguments.
@@ -301,19 +336,94 @@ A good setting would be:
 run-dir = $XDG_RUNTIME_DIR/git-perf
 ----
 
+hyperfine.xargs-options::
+	Options given to man:xargs[1] when the `--ghf-worktree-xargs'
+	option is used. Set this to '-r' to use the GNU extension to
+	ignore empty input. Otherwise supplying e.g. "git worktree
+	remove" will show an annoying usage error from
+	link:git-worktree[1] if there's no worktrees to operate on.
+
+HOOK CONFIGURATION[HOOKCFG]]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This will affect all git-hyperfine invocations, but you can use the
+path includes in 'git config' to limit them, or e.g. set them
+per-repository.
+
+All of the hooks are arbitrary shell commands (interpolated into the
+relevant man:hyperfine[1] options).
+
+If they're defined they'll be run even if you didn't provide the
+relevant optional '--setup', '--prepare', '<command>' or '--cleanup'
+option.
+
+In the case of '--setup' this wouldn't matter either way, since
+'git-hyperfine' always provides its own '--setup' template, but it
+might be unexpected in other cases.
+
+This is so that e.g. the '--cleanup' hook can be (ab)used to
+optionally cleanup 'git-hyperfine's own litter, you can even (ab)use
+it omit the '<command>' name and run the ook instead. In that case the
+title of the command will be the value defined in the hook
+configuration.
+
+hyperfine.hook.setup::
+	A hook for the '--setup' phase.
++
+I use the 'setup' hook to copy a 'config.mak' in-place with build
+configuration for 'git.git', and 'prepare' can be used to always drop
+FS caches.
+
+hyperfine.hook.prepare::
+	A hook for the '--prepare' phase.
++
+Can be used to e.g. drop FS caches, as shown in the man:hyperfine[1]
+README.md: https://github.com/sharkdp/hyperfine#basic-benchmark
+
+hyperfine.hook.command::
+	A hook for the '<command>' phase.
++
+It's probably a bad idea to use this hook for anything, any use of it
+will go into your benchmark results, but it's here for completeness
+and flexibility.
+
+hyperfine.hook.cleanup::
+	A hook for the '<command>' cleanup phase.
++
+The cleanup hook could be defined to e.g.:
++
+----
+git hyperfine --ghf-worktree-xargs remove
+----
+
 See the 'git-hyperfine-gitconfig.cfg' file in the 'git-hyperfine'
 repository for configuration examples. That's also available at
 https://gitlab.com/avar/git-hyperfine/-/blob/master/git-hyperfine-gitconfig.cfg
 and
 https://github.com/avar/git-hyperfine/blob/master/git-hyperfine-gitconfig.cfg
 
-EXAMPLES
---------
+EXAMPLES[[XMPL]]
+----------------
 
 Test two revisions, and show that w we'll run in our worktree paths:
 
 ----
 git hyperfine -L rev HEAD,HEAD~ -r 2 -s 'echo setup: $(pwd)' 'echo run: $(pwd)' -c 'echo cleanup: $(pwd)' -p 'echo prepare: $(pwd)' --show-output
+----
+
+Show when all of our hooks and commands would be run relative to one
+another:
+
+----
+git -c hyperfine.hook.setup='echo HOOK setup' \
+    -c hyperfine.hook.prepare='echo HOOK prepare' \
+    -c hyperfine.hook.command='echo HOOK command' \
+     -c hyperfine.hook.cleanup='echo HOOK cleanup' \
+     hyperfine --show-output -r 2 -L rev HEAD~1,HEAD~0 \
+     -s 'echo setup' \
+     -p 'echo prepare' \
+     -c 'echo cleanup' \
+     'git -P log --pretty=reference -1'
 ----
 
 DEPENDENCIES
@@ -330,11 +440,6 @@ COMPATIBILITY[[COMPAT]]
 compatible with Linux systems, BSDs, OSX, Solaris (not its /bin/sh
 though), AIX, HP/UX etc. etc. Any incompatibility is a (probably small
 and easily fixed) bug.
-
-AUTHOR
-------
-
-Ævar Arnfjörð Bjarmason
 
 INSTALLATION
 ------------
@@ -359,10 +464,10 @@ To build and install documentation add 'install-man' to that (only the
 latter target is needed). You can provide 'ASCIIDOCTOR' to be the path
 to your 'asciidoctor' (or compatible) program.
 
----
+----
 make man
 sudo make install-man prefix=/usr
----
+----
 
 HIPSTER INSTALLATION[[HIPSTER]]
 -------------------------------
@@ -377,18 +482,10 @@ sudo bash -c "make prefix=$HOME/local HIPSTER=Y install install-man -f<(curl -s 
 It doesn't even require man:bash[1] (or man:sudo[1]), but if you like
 to live dangerously.
 
-BUGS
-----
+AUTHOR
+------
 
-If man:hyperfine[1] introduces a new option 'git-hyperfine' currently
-needs to be updated to know how to pass it through (its option usage
-is somewhat irregular).
-
-
-<<HIPSTER,HIPSTER INSTALLATION>> mode will cache the downloaded
-program in the current working directory by virtue of being a
-functioning 'Makefile' under the hood. It should probably download a
-1GB tarball from somewhere instead to provide the full experience.
+Ævar Arnfjörð Bjarmason
 
 LICENSE
 -------
@@ -405,16 +502,64 @@ SEE ALSO
 --------
 
 man:hyperfine[1]
+
+BUGS
+----
+
+If man:hyperfine[1] introduces a new option 'git-hyperfine' currently
+needs to be updated to know how to pass it through (its option usage
+is somewhat irregular).
+
+<<HIPSTER,HIPSTER INSTALLATION>> mode will cache the downloaded
+program in the current working directory by virtue of being a
+functioning 'Makefile' under the hood. It should probably download a
+1GB tarball from somewhere instead to provide the full experience.
 EOF
 	exit 0
 fi
 
-## Configuration:
-##
-##	hyperfine.runtime-dir: eval'd; usually set to: $XDG_RUNTIME_DIR
-run_dir=$(git config --get hyperfine.run-dir)
-eval "run_dir=$run_dir"
-debug "config: run-dir: <$run_dir>"
+## Configuration
+cfg_run_dir=
+cfg_xargs_opts=
+cfg_hook_setup=
+cfg_hook_prepare=
+cfg_hook_command=
+cfg_hook_cleanup=
+parse_hyperfine_config () {
+	# I really should add an --output=sh or something to
+	# git-config(1).
+	git config ${BASH_VERSION:+-z }--get-regexp '^hyperfine\.' |
+	while read  ${BASH_VERSION:+-d $'\0' }k v
+	do
+		case "$k" in
+		hyperfine.run-dir)
+			echo cfg_run_dir="\"$v\""
+			;;
+		hyperfine.xargs-options)
+			echo cfg_xargs_opts="\"$v\""
+			;;
+		hyperfine.hook.setup)
+			echo cfg_hook_setup="\"$v\""
+			;;
+		hyperfine.hook.prepare)
+			echo cfg_hook_prepare="\"$v\""
+			;;
+		hyperfine.hook.command)
+			echo cfg_hook_command="\"$v\""
+			;;
+		hyperfine.hook.cleanup)
+			echo cfg_hook_cleanup="\"$v\""
+			;;
+		hyperfine.*)
+			echo "git-hyperfine: unknown option '$k'='$v' in config" >&2
+			;;
+		esac
+	done
+}	
+
+cfg=$(parse_hyperfine_config)
+debug "config to eval" $cfg
+eval "$cfg"
 
 ## We need to resolve the {rev} from the originating repository. Not
 ## our {run_dir}.
@@ -425,20 +570,21 @@ worktree_list () {
 	# I can't remember how to do this with just sed(1), but you
 	# can.
 	git worktree list --porcelain --porcelain |
-	grep "^worktree $run_dir" |
+	grep "^worktree $cfg_run_dir" |
 	sed 's/^worktree //'
 }
 if test -n "$worktree_list"
 then
 	worktree_list
-	exit 0
+	exit $?
 fi
 
 ## --ghf-worktree-xargs
 if test -n "$worktree_xargs"
 then
-	worktree_list | xargs -n 1 git worktree $@
-	exit 0
+	echo dry=$dry_run 
+	worktree_list | xargs -n 1${cfg_xargs_opts:+ $cfg_xargs_opts} ${dry_run:+hello }$@
+	exit $?
 fi
 
 ## --version output specific to git-hyperfine
@@ -465,18 +611,20 @@ fi
 ## We're chain-invoking ourselves to get --setup etc. output below,
 ## this is to avoid some f the painful shell escaping
 ghf_setup_template() {
-	cat <<-\EOF |
-	git_rev="$(git -C "{git_dir}" rev-parse {rev})" &&
+	test -n "$debug_trace" && echo "set -x &&"
+	cat <<-EOF |
+	git_rev="\$(git -C "{git_dir}" rev-parse {rev})" &&
 	if ! test -d "{run_dir}/{rev}"
 	then
 		git worktree add "{run_dir}/{rev}" "{rev}";
 	fi &&
-	git -C "{run_dir}/{rev}" reset --hard $git_rev &&
-	cd "{run_dir}/{rev}"
+	git -C "{run_dir}/{rev}" reset --quiet --hard \$git_rev &&
+	cd "{run_dir}/{rev}" ${trace:+ &&}
 	EOF
 	sed \
-	    -e "s!{run_dir}!$run_dir!g" \
-	    -e "s!{git_dir}!$git_dir!g"
+	    -e "s!{run_dir}!$cfg_run_dir!g" \
+	    -e "s!{git_dir}!$git_dir!g" &&
+	test -n "$trace" && echo "set -x"
 }
 
 ## Debug utility
@@ -486,26 +634,41 @@ emit_dry_run() {
 	printf "%s\n" $@
 }
 
+# We'll always provide --setup anyway, but we need these *_any for
+# things that aren't implicit
+prepare_any="$prepare$cfg_hook_prepare"
+command_any="$command$cfg_hook_command"
+cleanup_any="$prepare$cfg_hook_prepare"
+
+command_title=$command
+if test -n "$cfg_hook_command" && test -z "$command"
+then
+	command_title="$cfg_hook_command"
+fi
+
 ${dry_run:+emit_dry_run} \
 hyperfine $hyperfine_opt \
 	--setup " \
-		${ghf_trace:+set -x;} \
 		$(ghf_setup_template) \
+		${cfg_hook_setup:+ && $cfg_hook_setup} \
 		${setup:+ && $setup} \
 	" \
-	${prepare:+ --prepare "\
-		${ghf_trace:+set -x;} \
-		cd \"$run_dir/{rev}\" \
+	${prepare_any:+ --prepare "\
+		${trace:+set -x;} \
+		cd \"$cfg_run_dir/{rev}\" \
+		${cfg_hook_prepare:+ && $cfg_hook_prepare} \
 		${prepare:+ && $prepare} \
 	"} \
-	${cleanup:+ --cleanup "\
-		${ghf_trace:+set -x;} \
-		cd \"$run_dir/{rev}\" \
+	${cleanup_any:+ --cleanup "\
+		${trace:+set -x;} \
+		cd \"$cfg_run_dir/{rev}\" \
+		${cfg_hook_cleanup:+ && $cfg_hook_cleanup} \
 		${cleanup:+ && $cleanup} \
 	"} \
-	${command:+--command-name="$(tput setaf 6)$command$(tput sgr0)' in '$(tput setaf 6){rev}$(tput sgr0)"  \
+	${command_any:+--command-name="$(tput setaf 6)$command_title$(tput sgr0)' in '$(tput setaf 6){rev}$(tput sgr0)"  \
 	"\
-		${ghf_trace:+set -x;} \
-		cd \"$run_dir/{rev}\" &&
-		$command \
+		${trace:+set -x;} \
+		cd \"$cfg_run_dir/{rev}\" \
+		${cfg_hook_command:+ && $cfg_hook_command} \
+		${command:+ && $command} \
 	"}
