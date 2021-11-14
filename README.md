@@ -5,26 +5,40 @@ git-hyperfine(1) - wrapper around man:hyperfine\[1\], intercepts -L
 
 # SYNOPSIS
 
-Instead of:
+> 
+> 
+>     git hyperfine [<git-hyperfine-options>] -L rev <comma-delimited-git-revisions> [<hyperfine-options>]
+>     git hyperfine [<git-hyperfine-options>] -L rev HEAD1,HEAD0 -r 1 pwd
+>     git hyperfine [--ghf-dry-run] --ghf-worktree-xargs [<args>]
+>     git hyperfine --ghf-worktree-list
 
-    hyperfine [<hyperfine-options>]
-
-Do:
-
-    git hyperfine -L rev <git-revisions> [<hyperfine-options>]
+See more examples under [EXAMPLES](#XMPL) below.
 
 # DESCRIPTION
 
-This is a wrapper around man:hyperfine\[1\] which intercepts *-L rev
-\<git-revisions\>* and sets up a git-worktree(1) for each one.
+git-hyperfine is a thin wrapper around man:hyperfine\[1\] designed to
+make it convenient to benchmark different git revisions within a git
+repository.
+
+It *-L rev \<git-revisions\>* and sets up a git-worktree(1) for each one
+under a prefix you configure. Providing *-L rev\` is mandatory and will
+be used to create the '\<path\>* fed to *git worktree add*. We’ll then
+wrap man:hyperfine\[1\] so that any commands are run within this newly
+setup worktree.
+
+The rest of the usage is the same as man:hyperfine\[1\] itself, but see
+[OPTIONS](#OPT) and [ALTERED OPTIONS](#ALTOPT) for extra options on top,
+and details about how we intercept and munge certain options.
 
 It needs the --setup option from
-<https://github.com/sharkdp/hyperfine/pull/448>, and can benefit from
-*-r 1* as well: <https://github.com/sharkdp/hyperfine/pull/447>
+<https://github.com/sharkdp/hyperfine/pull/448>, and some of the
+examples here use the recent (as of late 2021) support for *-r 1*.
+
+# DISCUSSION
 
 To test say a \<git-revisions\> of *HEAD<sub>1,HEAD</sub>0* well resolve
-those comma-delimited revisions in the current working directory (which
-is assumed to be a git repository, or we’ll die).
+those comma-delimited revisions in the current working directory. You’re
+assumed to be running this within git repository, if not we’ll die.
 
 We’ll then expect a *hyperfine.run-dir* in your git-config(1) of e.g.
 (we’ll *eval* it, so you can use an env variable name):
@@ -41,21 +55,14 @@ directory such as */run/user/1001/git-perf*. We’ll then create (with
 
 Note that we use those literal names, i.e. *HEAD\~0*, not whatever *git
 rev-parse HEAD\~0*. This is so that we won’t create an arbitrary number
-of directories. We’ll expect that you can re-use them if you keep
-testing the last N revisions.
+of directories over multiple runs. We’ll expect that you can re-use them
+if you keep testing the last N revisions.
 
 # OPTIONS
 
 All options that *git-hyperfine* interprets are prefixed with *--ghf-*.
 Any other option is passed through to man:hyperfine\[1\]. We’ll change
 some of them as noted in [ALTERED OPTIONS](#ALTOPT).
-
-  - \--ghf-debug  
-    Emit debugging messages about what we’re doing internally.
-
-  - \--ghf-trace  
-    Instrument generated code with "set -x". For use with
-    man:git-hyperfine\[1\]*s '--show-output*.
 
   - \--ghf-dry-run  
     Don’t run the man:git-hyperfine\[1\] command, show what would have
@@ -69,14 +76,36 @@ some of them as noted in [ALTERED OPTIONS](#ALTOPT).
         git hyperfine --ghf-worktree-list | xargs -n 1 git worktree remove
 
   - \--ghf-worktree-xargs  
-    A convenience wrapper for piping 'ghf-worktree-list to the above
-    man:xargs\[1\] command. Use it as e.g:
+    A convenience wrapper for piping *--ghf-worktree-list* output to
+    man:xargs\[1\]. Equivalent to:
     
-        git hyperfine --ghf-worktree-xargs remove
+        git hyperfine --ghf-worktree-list | xargs -n 1 $(git config hyperfine.xargs-options) <your command>
     
-    Which will be the equivalent of the above command.
+    Use it as e.g.:
+    
+        git hyperfine --ghf-worktree-xargs git worktree remove
+    
+    To clean up the worktrees which git-hyperfine will create for
+    running benchmarks.
+    
+    Under *--dry-run* we inject an *echo* before whatever command it is
+    you wanted to run.
+
+  - \--ghf-trace  
+    Instrument generated code with "set -x". For use with
+    man:git-hyperfine\[1\]*s '--show-output*.
+
+  - \--ghf-debug, --ghf-debug-trace  
+    For debugging git-hyperfine itself. *--ghf-debug* shows debug output
+    about option parsing etc. The *--ghf-debug-trace* turn on *set -x*
+    for git-hyperfine itself, as opposed to *--ghf-trace* which’ll only
+    do it for your code.
 
 # ALTERED OPTIONS
+
+\<command\>: In addition to being altered for [1](git-worktree) use this
+is optional if *hyperfine.hook.command* is defined. See [HOOK
+CONFIGURATION](#HOOKCFG).
 
   - \--help, --version  
     git-hyperfine’s help and version output. The help output is the raw
@@ -103,6 +132,8 @@ some of them as noted in [ALTERED OPTIONS](#ALTOPT).
 This command can be configured through man:git-config\[1\], all the
 options are in the *hyperfine.\** namespace:
 
+## MANDATORY CONFIGURATION
+
   - hyperfine.run-dir  
     Mandatory configuration which determines where to place the
     man:git-worktree\[1\] trees we create for resting the *{rev}*
@@ -116,6 +147,62 @@ options are in the *hyperfine.\** namespace:
         [hyperfine]
         run-dir = $XDG_RUNTIME_DIR/git-perf
 
+  - hyperfine.xargs-options  
+    Options given to man:xargs\[1\] when the “--ghf-worktree-xargs”
+    option is used. Set this to *-r* to use the GNU extension to ignore
+    empty input. Otherwise supplying e.g. "git worktree remove" will
+    show an annoying usage error from [1](git-worktree) if there’s no
+    worktrees to operate on.
+
+## HOOK CONFIGURATION\[HOOKCFG\]\]
+
+This will affect all git-hyperfine invocations, but you can use the path
+includes in *git config* to limit them, or e.g. set them per-repository.
+
+All of the hooks are arbitrary shell commands (interpolated into the
+relevant man:hyperfine\[1\] options).
+
+If they’re defined they’ll be run even if you didn’t provide the
+relevant optional *--setup*, *--prepare*, *\<command\>* or *--cleanup*
+option.
+
+In the case of *--setup* this wouldn’t matter either way, since
+*git-hyperfine* always provides its own *--setup* template, but it might
+be unexpected in other cases.
+
+This is so that e.g. the *--cleanup* hook can be (ab)used to optionally
+cleanup *git-hyperfine’s own litter, you can even (ab)use it omit the
+'\<command\>* name and run the ook instead. In that case the title of
+the command will be the value defined in the hook configuration.
+
+  - hyperfine.hook.setup  
+    A hook for the *--setup* phase.
+    
+    I use the *setup* hook to copy a *config.mak* in-place with build
+    configuration for *git.git*, and *prepare* can be used to always
+    drop FS caches.
+
+  - hyperfine.hook.prepare  
+    A hook for the *--prepare* phase.
+    
+    Can be used to e.g. drop FS caches, as shown in the
+    man:hyperfine\[1\] README.md:
+    <https://github.com/sharkdp/hyperfine#basic-benchmark>
+
+  - hyperfine.hook.command  
+    A hook for the *\<command\>* phase.
+    
+    It’s probably a bad idea to use this hook for anything, any use of
+    it will go into your benchmark results, but it’s here for
+    completeness and flexibility.
+
+  - hyperfine.hook.cleanup  
+    A hook for the *\<command\>* cleanup phase.
+    
+    The cleanup hook could be defined to e.g.:
+    
+        git hyperfine --ghf-worktree-xargs remove
+
 See the *git-hyperfine-gitconfig.cfg* file in the *git-hyperfine*
 repository for configuration examples. That’s also available at
 <https://gitlab.com/avar/git-hyperfine/-/blob/master/git-hyperfine-gitconfig.cfg>
@@ -127,6 +214,19 @@ and
 Test two revisions, and show that w we’ll run in our worktree paths:
 
     git hyperfine -L rev HEAD,HEAD~ -r 2 -s 'echo setup: $(pwd)' 'echo run: $(pwd)' -c 'echo cleanup: $(pwd)' -p 'echo prepare: $(pwd)' --show-output
+
+Show when all of our hooks and commands would be run relative to one
+another:
+
+    git -c hyperfine.hook.setup='echo HOOK setup' \
+        -c hyperfine.hook.prepare='echo HOOK prepare' \
+        -c hyperfine.hook.command='echo HOOK command' \
+         -c hyperfine.hook.cleanup='echo HOOK cleanup' \
+         hyperfine --show-output -r 2 -L rev HEAD~1,HEAD~0 \
+         -s 'echo setup' \
+         -p 'echo prepare' \
+         -c 'echo cleanup' \
+         'git -P log --pretty=reference -1'
 
 # DEPENDENCIES
 
@@ -140,10 +240,6 @@ To install documentation you’ll need man:asciidoctor\[1\].
 compatible with Linux systems, BSDs, OSX, Solaris (not its /bin/sh
 though), AIX, HP/UX etc. etc. Any incompatibility is a (probably small
 and easily fixed) bug.
-
-# AUTHOR
-
-Ævar Arnfjörð Bjarmason
 
 # INSTALLATION
 
@@ -163,7 +259,8 @@ To build and install documentation add *install-man* to that (only the
 latter target is needed). You can provide *ASCIIDOCTOR* to be the path
 to your *asciidoctor* (or compatible) program.
 
-make man sudo make install-man prefix=/usr ---
+    make man
+    sudo make install-man prefix=/usr
 
 # HIPSTER INSTALLATION
 
@@ -175,16 +272,9 @@ for you:
 It doesn’t even require man:bash\[1\] (or man:sudo\[1\]), but if you
 like to live dangerously.
 
-# BUGS
+# AUTHOR
 
-If man:hyperfine\[1\] introduces a new option *git-hyperfine* currently
-needs to be updated to know how to pass it through (its option usage is
-somewhat irregular).
-
-[HIPSTER INSTALLATION](#HIPSTER) mode will cache the downloaded program
-in the current working directory by virtue of being a functioning
-*Makefile* under the hood. It should probably download a 1GB tarball
-from somewhere instead to provide the full experience.
+Ævar Arnfjörð Bjarmason
 
 # LICENSE
 
@@ -199,3 +289,14 @@ utilities it uses and extends. See
 # SEE ALSO
 
 man:hyperfine\[1\]
+
+# BUGS
+
+If man:hyperfine\[1\] introduces a new option *git-hyperfine* currently
+needs to be updated to know how to pass it through (its option usage is
+somewhat irregular).
+
+[HIPSTER INSTALLATION](#HIPSTER) mode will cache the downloaded program
+in the current working directory by virtue of being a functioning
+*Makefile* under the hood. It should probably download a 1GB tarball
+from somewhere instead to provide the full experience.
